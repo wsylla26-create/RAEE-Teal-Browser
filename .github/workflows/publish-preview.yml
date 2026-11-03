@@ -1,0 +1,45 @@
+name: Publish Android preview
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/publish-preview.yml']
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: publish-preview-v08
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      APK_URL: 'https://cdn.shopify.com/s/files/1/0606/5972/8433/files/RAEE-Teal-Browser-test_3d2a34fb-a674-4b15-a27d-277a45e1dc1e.apk?v=1793668335'
+    steps:
+      - name: Download and verify existing preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --proto '=https' --tlsv1.2 "$APK_URL" --output RAEE-Teal-Browser-test.apk
+          echo '73d0b11f6014f55d95d4da27110e6111cd83ea823d970d858ef416b696422d64  RAEE-Teal-Browser-test.apk' > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+      - name: Publish preview release
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > notes.md <<'NOTES'
+          Android browser preview version 0.8 by RAEE-INDUSTRIES.
+          
+          Download RAEE-Teal-Browser-test.apk on an Android 8.0+ phone and open it to install Teal Browser Preview.
+          Includes Xenphia's startup greeting, phone voice commands, English/Spanish/French/Italian speech, blinking home portrait, color fade controls, tabs and bookmarks.
+          
+          This is a debug-signed test build. Device acceptance testing is still required. General AI chat and precise lip-sync are not connected in this browser build. This is not a Google Play release.
+          The APK matches the Shopify-hosted preview; SHA256SUMS.txt is included for integrity verification.
+          NOTES
+          if gh release view v0.8.0-preview >/dev/null 2>&1; then
+            echo 'Release already exists; leaving published assets unchanged.'
+          else
+            gh release create v0.8.0-preview RAEE-Teal-Browser-test.apk SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "Teal Browser 0.8 — Android Preview" --notes-file notes.md
+          fi
